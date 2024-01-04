@@ -1,0 +1,5 @@
+coverage/*
+dist/*
+jest.config.js
+.eslintrc.js
+lint-report/
