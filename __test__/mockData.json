@@ -1,0 +1,45 @@
+{
+    "mockNotes": [
+        {
+            "_id": "id1",
+            "title": "title-1",
+            "note": "note-1",
+            "owner": "owner"
+        },
+        {
+            "_id": "id2",
+            "title": "title-2",
+            "note": "note-2",
+            "owner": "owner"
+        },
+        {
+            "_id": "id3",
+            "title": "title-3",
+            "note": "note-3",
+            "owner": "owner-2"
+        },
+        {
+            "_id": "share",
+            "title": "title-fail-3",
+            "note": "note-3",
+            "owner": "owner-2"
+        }
+    ],
+    "mockAccess": [
+        {
+            "_id": "a1",
+            "user": "owner",
+            "note": "id3"
+        },
+        {
+            "_id": "a2",
+            "user": "owner-3",
+            "note": "id3"
+        },
+        {
+            "_id": "a3",
+            "user": "owner-3",
+            "note": "id2"
+        }
+    ]
+}
