@@ -201,7 +201,7 @@ export class NotesController {
                     `The notes does not exists for noteId: ${noteId}, user: ${user._id} and correlationId: ${correlationId}`
                 );
                 throw new ApiError(
-                    StatusCodes.CONFLICT,
+                    StatusCodes.NOT_FOUND,
                     "Note does not exists"
                 );
             }
