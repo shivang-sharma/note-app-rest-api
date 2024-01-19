@@ -174,3 +174,44 @@ export async function CreateAccess(
     });
     return access;
 }
+
+export async function FindAccessByUserId(userId: string) {
+    const access = await Access.find({
+        user: new mongoose.Types.ObjectId(userId),
+    });
+    return access;
+}
+
+export async function SearchNotes(
+    ownerId: string,
+    hasAccessToNoteIds: mongoose.Types.ObjectId[],
+    searchString: string
+) {
+    const searchResult = await Note.find(
+        {
+            $and: [
+                {
+                    $or: [
+                        { owner: new mongoose.Types.ObjectId(ownerId) },
+                        { _id: { $in: hasAccessToNoteIds } },
+                    ],
+                },
+                {
+                    $text: {
+                        $search: searchString,
+                    },
+                },
+            ],
+        },
+        {
+            score: {
+                $meta: "textScore",
+            },
+        }
+    ).sort({
+        score: {
+            $meta: "textScore",
+        },
+    });
+    return searchResult;
+}

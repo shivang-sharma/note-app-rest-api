@@ -3,6 +3,7 @@ import type { CustomRequest } from "../../../../util/CustomRequest";
 import { Logger } from "../../../../util/Logger";
 import type { SearchService } from "../service/SearchService";
 import { StatusCodes } from "http-status-codes";
+import { ApiResponse } from "../../../../util/ApiResponse";
 
 export class SearchController {
     #logger = new Logger("API-SERVICE", "SearchController.ts");
@@ -28,7 +29,9 @@ export class SearchController {
             this.#logger.info(
                 `Call to SearchService ended for query: ${query}, and user: ${user?._id} and correlationId: ${correlationId}`
             );
-            res.status(StatusCodes.OK).json(result);
+            return res
+                .status(StatusCodes.OK)
+                .json(new ApiResponse(StatusCodes.OK, result));
         }
     };
 }

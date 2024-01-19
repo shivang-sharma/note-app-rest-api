@@ -23,6 +23,36 @@
             "title": "title-fail-3",
             "note": "note-3",
             "owner": "owner-2"
+        },
+        {
+            "_id": "s1",
+            "title": "sample mock title",
+            "note": "mocking modules using jest mock. Using jest.mock and jest.spyOn",
+            "owner": "o101"
+        },
+        {
+            "_id": "s2",
+            "title": "Using Typescript",
+            "note": "Using typescript in express with esbuild. Implementing rest apis in express. Writing unit test in typescript",
+            "owner": "o101"
+        },
+        {
+            "_id": "s3",
+            "title": "Mocking with Jest",
+            "note": "Mocking with jest. Clearing mock with jest.cleatMock. Mock using jest.fn().mockImplementationOnce",
+            "owner": "o102"
+        },
+        {
+            "_id": "s4",
+            "title": "Microservices",
+            "note": "Building scalable microservices using nodejs",
+            "owner": "o102"
+        },
+        {
+            "_id": "s5",
+            "title": "redis",
+            "note": "Use redis for cache. Redis can also be used as queu and for pub/sub also",
+            "owner": "o102"
         }
     ],
     "mockAccess": [
@@ -40,6 +70,16 @@
             "_id": "a3",
             "user": "owner-3",
             "note": "id2"
+        },
+        {
+            "_id": "a101",
+            "user": "o101",
+            "note": "s3"
+        },
+        {
+            "_id": "a102",
+            "user": "o101",
+            "note": "s5"
         }
     ]
 }
