@@ -5,7 +5,18 @@ on:
         branches: ["master"]
 
 jobs:
-  unit-test:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set Up Node.js
+      uses: actions/setup-node@v3.5.0
+      with:
+        node-version: 20
+        cache: 'npm'
+    - run: npm ci
+    - run: npm run build --if-present
+  Unit-Test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout from PR branch
