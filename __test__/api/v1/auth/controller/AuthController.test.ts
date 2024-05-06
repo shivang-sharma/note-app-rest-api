@@ -4,8 +4,10 @@ import { IUser } from "../../../../../src/db";
 import { CustomRequest } from "../../../../../src/util/CustomRequest";
 import { Response } from "express";
 import { ApiError } from "../../../../../src/util/ApiError";
+import { expect } from "chai";
+import sinon from "sinon";
 
-jest.mock("../../../../../src/api/v1/auth/service/AuthService");
+// jest.mock("../../../../../src/api/v1/auth/service/AuthService");
 
 describe("AuthController", () => {
     let authController: AuthController;
@@ -14,30 +16,33 @@ describe("AuthController", () => {
         beforeEach(() => {
             authService = new AuthService();
             authController = new AuthController(authService);
-            jest.clearAllMocks();
+            // jest.clearAllMocks();
+            sinon.restore();
         });
         it("should-signup-successfully", async () => {
-            jest.spyOn(authService, "signUpService").mockImplementationOnce(
-                (
-                    username: string,
-                    fullName: string,
-                    email: string,
-                    password: string
-                ) => {
-                    return new Promise((resolve, reject) => {
-                        resolve({
-                            exist: false,
-                            failed: false,
-                            user: {
-                                _id: "uuid",
-                                username: username,
-                                fullName: fullName,
-                                email: email,
-                            } as IUser,
+            sinon
+                .stub(authService, "signUpService")
+                .callsFake(
+                    (
+                        username: string,
+                        fullName: string,
+                        email: string,
+                        password: string
+                    ) => {
+                        return new Promise((resolve, reject) => {
+                            resolve({
+                                exist: false,
+                                failed: false,
+                                user: {
+                                    _id: "uuid",
+                                    username: username,
+                                    fullName: fullName,
+                                    email: email,
+                                } as IUser,
+                            });
                         });
-                    });
-                }
-            );
+                    }
+                );
             const result = await authController.signUp(
                 {
                     body: {
@@ -68,16 +73,16 @@ describe("AuthController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data._id).toEqual("uuid");
-            expect((result as any).body.data.email).toEqual("email@gmail.com");
-            expect((result as any).body.data.fullName).toEqual("fullName");
-            expect((result as any).body.data.username).toEqual("username");
-            expect((result as any).body.message).toEqual(
+            expect((result as any).body.data._id).to.be.equal("uuid");
+            expect((result as any).body.data.email).to.be.equal("email@gmail.com");
+            expect((result as any).body.data.fullName).to.be.equal("fullName");
+            expect((result as any).body.data.username).to.be.equal("username");
+            expect((result as any).body.message).to.be.equal(
                 "User registered Successfully"
             );
-            expect((result as any).body.statusCode).toEqual(200);
-            expect((result as any).body.success).toBeTruthy();
-            expect((result as any).statusCode).toEqual(201);
+            expect((result as any).body.statusCode).to.be.equal(200);
+            expect((result as any).body.success).to.be.true;
+            expect((result as any).statusCode).to.be.equal(201);
         });
         it("should-fail-for-invalid-body", async () => {
             authController
@@ -99,12 +104,12 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(400);
-                    expect(error.message).toEqual("Invalid input data");
+                    expect(error.statusCode).to.be.equal(400);
+                    expect(error.message).to.be.equal("Invalid input data");
                 });
         });
         it("should-throw-user-exist", () => {
-            jest.spyOn(authService, "signUpService").mockImplementationOnce(
+            sinon.stub(authService, "signUpService").callsFake(
                 (
                     username: string,
                     fullName: string,
@@ -139,14 +144,14 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(409);
-                    expect(error.message).toEqual(
+                    expect(error.statusCode).to.be.equal(409);
+                    expect(error.message).to.be.equal(
                         "User with email or username already exists"
                     );
                 });
         });
         it("should-throw-internal-server", () => {
-            jest.spyOn(authService, "signUpService").mockImplementationOnce(
+            sinon.stub(authService, "signUpService").callsFake(
                 (
                     username: string,
                     fullName: string,
@@ -181,8 +186,8 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(500);
-                    expect(error.message).toEqual(
+                    expect(error.statusCode).to.be.equal(500);
+                    expect(error.message).to.be.equal(
                         "Something went wrong while registering the user"
                     );
                 });
@@ -192,10 +197,11 @@ describe("AuthController", () => {
         beforeEach(() => {
             authService = new AuthService();
             authController = new AuthController(authService);
-            jest.clearAllMocks();
+            // jest.clearAllMocks();
+            sinon.restore()
         });
         it("should-login-successfully", async () => {
-            jest.spyOn(authService, "loginService").mockImplementationOnce(
+            sinon.stub(authService, "loginService").callsFake(
                 (email: string, password: string) => {
                     return new Promise((resolve, reject) => {
                         resolve({
@@ -259,27 +265,27 @@ describe("AuthController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data.user._id).toEqual("uuid");
-            expect((result as any).body.data.user.email).toEqual(
+            expect((result as any).body.data.user._id).to.be.equal("uuid");
+            expect((result as any).body.data.user.email).to.be.equal(
                 "email@gmail.com"
             );
-            expect((result as any).body.data.user.fullName).toEqual("fullName");
-            expect((result as any).body.data.user.username).toEqual("username");
-            expect((result as any).body.data.accessToken).toEqual(
+            expect((result as any).body.data.user.fullName).to.be.equal("fullName");
+            expect((result as any).body.data.user.username).to.be.equal("username");
+            expect((result as any).body.data.accessToken).to.be.equal(
                 "accessToken"
             );
-            expect((result as any).body.data.refreshToken).toEqual(
+            expect((result as any).body.data.refreshToken).to.be.equal(
                 "refreshToken"
             );
-            expect((result as any).body.message).toEqual(
+            expect((result as any).body.message).to.be.equal(
                 "User logged In Successfully"
             );
-            expect((result as any).body.statusCode).toEqual(200);
-            expect((result as any).body.success).toBeTruthy();
-            expect((result as any).statusCode).toEqual(200);
+            expect((result as any).body.statusCode).to.be.equal(200);
+            expect((result as any).body.success).to.be.true
+            expect((result as any).statusCode).to.be.equal(200);
         });
         it("should-invalid-credentials", async () => {
-            jest.spyOn(authService, "loginService").mockImplementationOnce(
+            sinon.stub(authService, "loginService").callsFake(
                 (email: string, password: string) => {
                     return new Promise((resolve, reject) => {
                         resolve({
@@ -311,12 +317,12 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(401);
-                    expect(error.message).toEqual("Invalid user credentials");
+                    expect(error.statusCode).to.be.equal(401);
+                    expect(error.message).to.be.equal("Invalid user credentials");
                 });
         });
         it("should-not-found", async () => {
-            jest.spyOn(authService, "loginService").mockImplementationOnce(
+            sinon.stub(authService, "loginService").callsFake(
                 (email: string, password: string) => {
                     return new Promise((resolve, reject) => {
                         resolve({
@@ -348,12 +354,12 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(404);
-                    expect(error.message).toEqual("User does not exist");
+                    expect(error.statusCode).to.be.equal(404);
+                    expect(error.message).to.be.equal("User does not exist");
                 });
         });
         it("should-fail-internal-server-error", async () => {
-            jest.spyOn(authService, "loginService").mockImplementationOnce(
+            sinon.stub(authService, "loginService").callsFake(
                 (email: string, password: string) => {
                     return new Promise((resolve, reject) => {
                         resolve({
@@ -385,8 +391,8 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(500);
-                    expect(error.message).toEqual("Failed with unknown error");
+                    expect(error.statusCode).to.be.equal(500);
+                    expect(error.message).to.be.equal("Failed with unknown error");
                 });
         });
         it("should-fail-invalid-payload", async () => {
@@ -407,9 +413,9 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(400);
-                    expect(error.message).toEqual("Invalid input data");
-                    expect(error.errors.length).toBeGreaterThan(0);
+                    expect(error.statusCode).to.be.equal(400);
+                    expect(error.message).to.be.equal("Invalid input data");
+                    expect(error.errors.length).to.have.greaterThan(0);
                 });
         });
     });
@@ -417,10 +423,10 @@ describe("AuthController", () => {
         beforeEach(() => {
             authService = new AuthService();
             authController = new AuthController(authService);
-            jest.clearAllMocks();
+            sinon.restore()
         });
         it("should-logout-successfully", async () => {
-            jest.spyOn(authService, "logoutService").mockImplementationOnce(
+            sinon.stub(authService, "logoutService").callsFake(
                 (id: string) => {
                     return new Promise((resolve, reject) => {
                         resolve();
@@ -466,11 +472,11 @@ describe("AuthController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data).toEqual({});
-            expect((result as any).body.message).toEqual("User logged Out");
-            expect((result as any).body.statusCode).toEqual(200);
-            expect((result as any).body.success).toBeTruthy();
-            expect((result as any).statusCode).toEqual(200);
+            expect((result as any).body.data).to.be.deep.equal({});
+            expect((result as any).body.message).to.be.equal("User logged Out");
+            expect((result as any).body.statusCode).to.be.equal(200);
+            expect((result as any).body.success).to.be.true;
+            expect((result as any).statusCode).to.be.equal(200);
         });
         it("should-throw-unauthorized", async () => {
             authController
@@ -485,8 +491,8 @@ describe("AuthController", () => {
                     } as Response
                 )
                 .catch((error: ApiError) => {
-                    expect(error.statusCode).toEqual(401);
-                    expect(error.message).toEqual("Unauthorized");
+                    expect(error.statusCode).to.be.equal(401);
+                    expect(error.message).to.be.equal("Unauthorized");
                 });
         });
     });

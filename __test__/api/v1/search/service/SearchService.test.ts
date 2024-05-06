@@ -1,43 +1,60 @@
+import sinon from "sinon";
+import { expect } from "chai";
+import mongoose, { Document, mongo } from "mongoose";
 import { SearchService } from "../../../../../src/api/v1/search/service/SearchService";
 import { ApiError } from "../../../../../src/util/ApiError";
 import { mockNotes, mockAccess } from "../../../../mockData.json";
-jest.mock("../../../../../src/db/queries", () => {
-    const orignalModule = jest.requireActual("../../../../../src/db/queries");
-    return {
-        __esModule: true,
-        ...orignalModule,
-        FindAccessByUserId: jest.fn().mockImplementation((userId: string) => {
-            if (userId.startsWith("exception")) {
-                throw new Error("Failed");
-            }
-            const access = mockAccess.filter(
-                (access) => access.user === userId
-            );
-            return access;
-        }),
-        SearchNotes: jest
-            .fn()
-            .mockImplementation(
-                (
-                    ownerId: string,
-                    hasAccessToNoteIds: string[],
-                    searchString: string
-                ) => {
-                    const result = mockNotes.filter((mockNote) => {
-                        return (
-                            (mockNote.owner === ownerId ||
-                                hasAccessToNoteIds.includes(mockNote._id)) &&
-                            (mockNote.note.includes(searchString) ||
-                                mockNote.title.includes(searchString))
-                        );
-                    });
-                    return result;
-                }
-            ),
-    };
-});
+import * as queries from "../../../../../src/db/queries";
+import { IAccess, INote } from "../../../../../src/db";
 
 describe("SearchService", () => {
+    before(() => {
+        sinon
+            .stub(queries, "FindAccessByUserId")
+            .callsFake((userId: string) => {
+                return new Promise((resolve, reject) => {
+                    if (userId.startsWith("exception")) {
+                        return reject("Failed");
+                    }
+                    const access = mockAccess.filter(
+                        (access) => access.user === userId
+                    );
+                    return resolve(
+                        access as unknown[] as (Document<unknown, {}, IAccess> &
+                            IAccess & { _id: mongoose.Types.ObjectId })[]
+                    );
+                });
+            });
+        sinon
+            .stub(queries, "SearchNotes")
+            .callsFake(
+                (
+                    ownerId: string,
+                    hasAccessToNoteIds: mongoose.Types.ObjectId[],
+                    searchString: string
+                ) => {
+                    return new Promise((resolve, reject) => {
+                        const result = mockNotes.filter((mockNote) => {
+                            return (
+                                (mockNote.owner === ownerId ||
+                                    hasAccessToNoteIds.includes(
+                                        mockNote._id as unknown as mongoose.Types.ObjectId
+                                    )) &&
+                                (mockNote.note.includes(searchString) ||
+                                    mockNote.title.includes(searchString))
+                            );
+                        });
+                        return resolve(
+                            result as unknown as (Document<unknown, {}, INote> &
+                                INote & { _id: mongoose.Types.ObjectId })[]
+                        );
+                    });
+                }
+            );
+    });
+    after(() => {
+        sinon.restore();
+    });
     let searchService: SearchService;
     describe("searchService", () => {
         it("should-return-owned-note", async () => {
@@ -46,39 +63,39 @@ describe("SearchService", () => {
                 "o101",
                 "typescript"
             );
-            expect(result.length).toEqual(1);
-            expect(result[0]?._id).toEqual("s2");
-            expect(result[0]?.title).toEqual("Using Typescript");
+            expect(result.length).to.be.equal(1);
+            expect(result[0]?._id).to.be.equal("s2");
+            expect(result[0]?.title).to.be.equal("Using Typescript");
         });
         it("should-return-shared-note", async () => {
             searchService = new SearchService();
             const result = await searchService.searchService("o101", "cache");
-            expect(result.length).toEqual(1);
-            expect(result[0]?._id).toEqual("s5");
-            expect(result[0]?.title).toEqual("redis");
-            expect(result[0]?.owner).toEqual("o102");
+            expect(result.length).to.be.equal(1);
+            expect(result[0]?._id).to.be.equal("s5");
+            expect(result[0]?.title).to.be.equal("redis");
+            expect(result[0]?.owner).to.be.equal("o102");
         });
         it("should-return-both-owned-and-shared-note", async () => {
             searchService = new SearchService();
             const result = await searchService.searchService("o101", "mock");
-            expect(result.length).toEqual(2);
-            expect(result[0]?._id).toEqual("s1");
-            expect(result[0]?.title).toEqual("sample mock title");
-            expect(result[0]?.owner).toEqual("o101");
-            expect(result[1]?._id).toEqual("s3");
-            expect(result[1]?.title).toEqual("Mocking with Jest");
-            expect(result[1]?.owner).toEqual("o102");
+            expect(result.length).to.be.equal(2);
+            expect(result[0]?._id).to.be.equal("s1");
+            expect(result[0]?.title).to.be.equal("sample mock title");
+            expect(result[0]?.owner).to.be.equal("o101");
+            expect(result[1]?._id).to.be.equal("s3");
+            expect(result[1]?.title).to.be.equal("Mocking with Jest");
+            expect(result[1]?.owner).to.be.equal("o102");
         });
         it("should-return-empty-owned-and-shared-note", async () => {
             searchService = new SearchService();
             const result = await searchService.searchService("o101", "rabbit");
-            expect(result.length).toEqual(0);
+            expect(result.length).to.be.equal(0);
         });
         it("should-throw-internal-server-error", async () => {
             searchService = new SearchService();
-            expect(
-                searchService.searchService("exception", "rabbit")
-            ).rejects.toThrow(ApiError);
+            searchService
+                .searchService("exception", "rabbit")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
 });

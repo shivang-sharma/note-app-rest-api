@@ -2,6 +2,8 @@ import { SearchService } from "../../../../../src/api/v1/search/service/SearchSe
 import { SearchController } from "../../../../../src/api/v1/search/controller/SearchController";
 import { CustomRequest } from "../../../../../src/util/CustomRequest";
 import type { Response } from "express";
+import sinon from "sinon";
+import { expect } from "chai";
 describe("SearchController", () => {
     let searchService: SearchService;
     let searchController: SearchController;
@@ -9,16 +11,16 @@ describe("SearchController", () => {
         beforeEach(() => {
             searchService = new SearchService();
             searchController = new SearchController(searchService);
-            jest.clearAllMocks();
+            sinon.restore();
         });
         it("should-return-200-and-notes", async () => {
-            jest.spyOn(searchService, "searchService").mockImplementation(
-                (userId: string, searchString: string) => {
+            sinon
+                .stub(searchService, "searchService")
+                .callsFake((userId: string, searchString: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve([]);
                     });
-                }
-            );
+                });
             const result = await searchController.search(
                 {
                     user: {
@@ -49,8 +51,8 @@ describe("SearchController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.statusCode).toEqual(200);
-            expect((result as any).body.data.length).toEqual(0);
+            expect((result as any).body.statusCode).to.be.equal(200);
+            expect((result as any).body.data.length).to.be.equal(0);
         });
     });
 });
