@@ -4,7 +4,9 @@ import { Response, response } from "express";
 import { CustomRequest } from "../../../../../src/util/CustomRequest";
 import mongoose from "mongoose";
 import { ApiError } from "../../../../../src/util/ApiError";
-jest.mock("../../../../../src/api/v1/notes/service/NotesService");
+import sinon from "sinon";
+import { expect } from "chai";
+// jest.mock("../../../../../src/api/v1/notes/service/NotesService");
 
 describe("NotesController", () => {
     let notesController: NotesController;
@@ -13,13 +15,10 @@ describe("NotesController", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore();
         });
         it("should-success-with-ownedNotesArray-and-sharedWithMeArray", async () => {
-            jest.spyOn(
-                notesService,
-                "getAllNotesService"
-            ).mockResolvedValueOnce({
+            sinon.stub(notesService, "getAllNotesService").resolves({
                 sharedWithMe: [],
                 ownedNotes: [],
             });
@@ -50,23 +49,24 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect(result).toBeDefined();
-            expect(result?.statusCode).toEqual(200);
-            expect((result as any).body.data.ownedNotes).not.toBeNull();
-            expect((result as any).body.data.ownedNotes).toHaveLength(0);
-            expect((result as any).body.data.sharedWithMe).not.toBeNull();
-            expect((result as any).body.data.sharedWithMe).toHaveLength(0);
+            expect(result).not.to.be.undefined;
+            expect(result?.statusCode).to.be.equal(200);
+            expect((result as any).body.data.ownedNotes).not.to.be.null;
+            expect((result as any).body.data.ownedNotes).to.be.length(0);
+            expect((result as any).body.data.sharedWithMe).not.to.be.null;
+            expect((result as any).body.data.sharedWithMe).to.be.length(0);
         });
     });
     describe("getNote", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore();
         });
         it("should-successfully-return-note", async () => {
-            jest.spyOn(notesService, "getNoteService").mockImplementationOnce(
-                (userId: string, noteId: string) => {
+            sinon
+                .stub(notesService, "getNoteService")
+                .callsFake((userId: string, noteId: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
                             note: {
@@ -78,8 +78,7 @@ describe("NotesController", () => {
                             },
                         });
                     });
-                }
-            );
+                });
             const id = "65a67af796a5057549e8b274";
             const result = await notesController.getNote(
                 {
@@ -111,15 +110,15 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data.note.owner.toString()).toEqual(
+            expect((result as any).body.data.note.owner.toString()).to.be.equal(
                 "65a67af796a5057549e8b274"
             );
-            expect((result as any).statusCode).toEqual(200);
+            expect((result as any).statusCode).to.be.equal(200);
         });
 
         it("should-fail-at-noteId-validation", async () => {
-            await expect(
-                notesController.getNote(
+            notesController
+                .getNote(
                     {
                         user: {
                             _id: "65a67af796a5057549e8b274",
@@ -136,20 +135,20 @@ describe("NotesController", () => {
                         },
                     } as Response
                 )
-            ).rejects.toThrow(ApiError);
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
         it("should-fail-with-note-not-found", async () => {
-            jest.spyOn(notesService, "getNoteService").mockImplementationOnce(
-                (userId: string, noteId: string) => {
+            sinon
+                .stub(notesService, "getNoteService")
+                .callsFake((userId: string, noteId: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
                             note: null,
                         });
                     });
-                }
-            );
-            await expect(
-                notesController.getNote(
+                });
+            notesController
+                .getNote(
                     {
                         user: {
                             _id: "65a67af796a5057549e8b274",
@@ -166,20 +165,20 @@ describe("NotesController", () => {
                         },
                     } as Response
                 )
-            ).rejects.toThrow(ApiError);
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("postNote", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore()
         });
         it("should-create-note-successfully", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "createNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -225,14 +224,14 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data.title).toEqual("newTitle");
-            expect((result as any).statusCode).toEqual(201);
+            expect((result as any).body.data.title).to.be.equal("newTitle");
+            expect((result as any).statusCode).to.be.equal(201);
         });
         it("should-throw-error-when-note-exist-with-title", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "createNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -263,14 +262,14 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(409);
+                    expect(error.statusCode).to.be.equal(409);
                 });
         });
         it("should-throw-error-when-note-create-failed", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "createNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -301,7 +300,7 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(500);
+                    expect(error.statusCode).to.be.equal(500);
                 });
         });
     });
@@ -309,13 +308,13 @@ describe("NotesController", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore();
         });
         it("should-update-successfully", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "updateNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -364,8 +363,8 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data.title).toEqual("updatedTitle");
-            expect((result as any).statusCode).toEqual(200);
+            expect((result as any).body.data.title).to.be.equal("updatedTitle");
+            expect((result as any).statusCode).to.be.equal(200);
         });
         it("should-throw-error-bad-body-validation-error", async () => {
             notesController
@@ -391,7 +390,7 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(400);
+                    expect(error.statusCode).to.be.equal(400);
                 });
         });
         it("should-throw-error-noteId-validation-error", async () => {
@@ -418,14 +417,14 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(400);
+                    expect(error.statusCode).to.be.equal(400);
                 });
         });
         it("should-throw-error-note-exists", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "updateNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -459,14 +458,14 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(409);
+                    expect(error.statusCode).to.be.equal(409);
                 });
         });
         it("should-throw-error-does-not-exists", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "updateNoteService"
-            ).mockImplementationOnce(
+            ).callsFake(
                 (userId: string, title: string, note: string) => {
                     return new Promise((resolve, reject) => {
                         return resolve({
@@ -500,7 +499,7 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(404);
+                    expect(error.statusCode).to.be.equal(404);
                 });
         });
     });
@@ -508,13 +507,13 @@ describe("NotesController", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore()
         });
         it("should-delete-successfully", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "deleteNoteService"
-            ).mockImplementationOnce((userId: string, noteId: string) => {
+            ).callsFake((userId: string, noteId: string) => {
                 return new Promise((resolve, reject) => {
                     return resolve({
                         failed: false,
@@ -556,14 +555,14 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.statusCode).toEqual(200);
-            expect((result as any).body.data.title).toEqual("deletedTitle");
+            expect((result as any).body.statusCode).to.be.equal(200);
+            expect((result as any).body.data.title).to.be.equal("deletedTitle");
         });
         it("should-throw-failed", async () => {
-            jest.spyOn(
+            sinon.stub(
                 notesService,
                 "deleteNoteService"
-            ).mockImplementationOnce((userId: string, noteId: string) => {
+            ).callsFake((userId: string, noteId: string) => {
                 return new Promise((resolve, reject) => {
                     return resolve({
                         failed: true,
@@ -571,7 +570,6 @@ describe("NotesController", () => {
                     });
                 });
             });
-            await expect(
                 notesController.deleteNote(
                     {
                         user: {
@@ -601,18 +599,17 @@ describe("NotesController", () => {
                             };
                         },
                     } as Response
-                )
-            ).rejects.toThrow(ApiError);
+                ).catch(error=>expect(error).to.be.instanceOf(ApiError))
         });
     });
     describe("shareNote", () => {
         beforeEach(() => {
             notesService = new NotesService();
             notesController = new NotesController(notesService);
-            jest.clearAllMocks();
+            sinon.restore()
         });
         it("should-share-successfully", async () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -662,12 +659,12 @@ describe("NotesController", () => {
                     },
                 } as Response
             );
-            expect((result as any).body.data).toBeNull();
-            expect((result as any).body.message).toEqual("Access granted");
-            expect((result as any).body.statusCode).toEqual(200);
+            expect((result as any).body.data).to.be.null;
+            expect((result as any).body.message).to.be.equal("Access granted");
+            expect((result as any).body.statusCode).to.be.equal(200);
         });
         it("should-throw-not-authorized", () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -706,11 +703,11 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(401);
+                    expect(error.statusCode).to.be.equal(401);
                 });
         });
         it("should-throw-note-does-note-exist", () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -749,11 +746,11 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(404);
+                    expect(error.statusCode).to.be.equal(404);
                 });
         });
         it("should-throw-to-be-shared-with-user-does-not-exist", () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -792,11 +789,11 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(404);
+                    expect(error.statusCode).to.be.equal(404);
                 });
         });
         it("should-throw-failed", () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -835,11 +832,11 @@ describe("NotesController", () => {
                     } as Response
                 )
                 .catch((error) => {
-                    expect(error.statusCode).toEqual(500);
+                    expect(error.statusCode).to.be.equal(500);
                 });
         });
         it("should-throw-noteId-not-valid", () => {
-            jest.spyOn(notesService, "shareNoteService").mockImplementationOnce(
+            sinon.stub(notesService, "shareNoteService").callsFake(
                 (
                     userId: string,
                     noteId: string,
@@ -856,28 +853,30 @@ describe("NotesController", () => {
                     });
                 }
             );
-            notesController.shareNote(
-                {
-                    user: {
-                        _id: "65a67af796a5057549e8b274",
-                    },
-                    params: {
-                        noteId: "6",
-                    },
-                    body: {
-                        email: "email@gmail.com",
-                    },
-                } as unknown as CustomRequest,
-                {
-                    getHeader: (header: string) => {
-                        if (header === "X-CorrelationId") {
-                            return "correlationId";
-                        }
-                    },
-                } as Response
-            ).catch((error)=> {
-                expect(error.statusCode).toEqual(400)
-            });
+            notesController
+                .shareNote(
+                    {
+                        user: {
+                            _id: "65a67af796a5057549e8b274",
+                        },
+                        params: {
+                            noteId: "6",
+                        },
+                        body: {
+                            email: "email@gmail.com",
+                        },
+                    } as unknown as CustomRequest,
+                    {
+                        getHeader: (header: string) => {
+                            if (header === "X-CorrelationId") {
+                                return "correlationId";
+                            }
+                        },
+                    } as Response
+                )
+                .catch((error) => {
+                    expect(error.statusCode).to.be.equal(400);
+                });
         });
     });
 });

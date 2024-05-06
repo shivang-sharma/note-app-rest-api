@@ -1,33 +1,46 @@
+import sinon from "sinon";
+import mongoose, { Document, ObjectId } from "mongoose";
 import { NotesService } from "../../../../../src/api/v1/notes/service/NotesService";
 import { ApiError } from "../../../../../src/util/ApiError";
 import { mockNotes, mockAccess } from "../../../../mockData.json";
-jest.mock("../../../../../src/db/queries", () => {
-    const originalModule = jest.requireActual("../../../../../src/db/queries");
-    return {
-        __esModule: true,
-        ...originalModule,
-        CreateAccess: jest
-            .fn()
-            .mockImplementation(
-                (noteId: string, toBeSharedWithUserId: string) => {
-                    mockAccess.push({
-                        _id: `new${noteId}`,
-                        note: noteId,
-                        user: toBeSharedWithUserId,
+import * as queries from "../../../../../src/db/queries";
+import { IAccess, INote, IUser } from "../../../../../src/db";
+import { expect } from "chai";
+describe("NotesService", () => {
+    let sandbox: sinon.SinonSandbox;
+    before(() => {
+        sandbox = sinon.createSandbox();
+        sandbox.restore();
+        sandbox.reset();
+        sandbox.verifyAndRestore();
+        sandbox
+            .stub(queries, "CreateAccess")
+            .callsFake(
+                (
+                    noteId: mongoose.Types.ObjectId,
+                    toBeSharedWithUserId: mongoose.Types.ObjectId
+                ) => {
+                    return new Promise((resolve, reject) => {
+                        mockAccess.push({
+                            _id: `new${noteId}`,
+                            note: noteId.toString(),
+                            user: toBeSharedWithUserId.toString(),
+                        });
+                        return resolve({
+                            _id: `new${noteId}`,
+                            note: noteId,
+                            user: toBeSharedWithUserId,
+                        } as unknown as Document<unknown, {}, IAccess> &
+                            IAccess & { _id: mongoose.Types.ObjectId });
                     });
-                    return {
-                        _id: `new${noteId}`,
-                        note: noteId,
-                        user: toBeSharedWithUserId,
-                    };
                 }
-            ),
-        CreateNote: jest
-            .fn()
-            .mockImplementation(
-                (title: string, userId: string, note: string) => {
+            );
+        sandbox
+            .stub(queries, "CreateNote")
+            .callsFake((title: string, userId: string, note: string) => {
+                return new Promise((resolve, reject) => {
                     if (title.startsWith("exception")) {
-                        throw new Error("Failed");
+                        return reject("Failed");
                     }
                     mockNotes.push({
                         _id: `new${title}`,
@@ -35,110 +48,192 @@ jest.mock("../../../../../src/db/queries", () => {
                         owner: userId,
                         note: note,
                     });
-                    return {
+                    return resolve({
                         _id: `new${title}`,
                         title: title,
                         owner: userId,
                         note: note,
-                    };
-                }
-            ),
-        FindAccessById: jest.fn().mockImplementation((accessId) => {
-            const access = mockAccess.find((a) => a._id === accessId);
-            if (access && access.note.startsWith("share")) {
-                return null;
-            }
-            return access;
-        }),
-        FindAccessByUserIdAndNoteId: jest
-            .fn()
-            .mockImplementation((userId: string, noteId: string) => {
-                if (userId.startsWith("exception")) {
-                    throw new Error("Failed");
-                }
+                    } as unknown as Document<unknown, {}, INote> &
+                        INote & { _id: mongoose.Types.ObjectId });
+                });
+            });
+        sandbox.stub(queries, "FindAccessById").callsFake((accessId) => {
+            return new Promise((resolve, reject) => {
                 const access = mockAccess.find(
-                    (access) => access.note === noteId && access.user === userId
+                    (a) => a._id === accessId.toString()
                 );
-                return access ? access : null;
-            }),
-        FindNoteAndDeleteByNoteIdAndOwnerId: jest
-            .fn()
-            .mockImplementation((noteId: string, userId: string) => {
-                if (userId.startsWith("exception")) {
-                    throw new Error("Fail");
+                if (access && access.note.startsWith("share")) {
+                    return resolve(null);
                 }
-                return mockNotes.find(
-                    (note) => note._id === noteId && note.owner === userId
+                return resolve(
+                    access as unknown as Document<unknown, {}, IAccess> &
+                        IAccess & { _id: mongoose.Types.ObjectId }
                 );
-            }),
-        FindNoteAndUpdateByNoteIdAndOwnerId: jest
-            .fn()
-            .mockImplementation(
+            });
+        });
+        sandbox
+            .stub(queries, "FindAccessByUserIdAndNoteId")
+            .callsFake((userId: string, noteId: string) => {
+                return new Promise((resolve, reject) => {
+                    if (userId.startsWith("exception")) {
+                        return reject("Failed");
+                    }
+                    const access = mockAccess.find(
+                        (access) =>
+                            access.note === noteId && access.user === userId
+                    );
+                    return resolve(
+                        access
+                            ? (access as unknown as Document<
+                                  unknown,
+                                  {},
+                                  IAccess
+                              > &
+                                  IAccess & { _id: mongoose.Types.ObjectId })
+                            : null
+                    );
+                });
+            });
+
+        sandbox
+            .stub(queries, "FindNoteAndDeleteByNoteIdAndOwnerId")
+            .callsFake((noteId: string, userId: string) => {
+                return new Promise((resolve, reject) => {
+                    if (userId.startsWith("exception")) {
+                        return reject("Fail");
+                    }
+                    return resolve(
+                        mockNotes.find(
+                            (note) =>
+                                note._id === noteId && note.owner === userId
+                        ) as unknown as Document<unknown, {}, INote> &
+                            INote & { _id: mongoose.Types.ObjectId }
+                    );
+                });
+            });
+        sandbox
+            .stub(queries, "FindNoteAndUpdateByNoteIdAndOwnerId")
+            .callsFake(
                 (
                     noteId: string,
                     userId: string,
                     title: string,
                     note: string
                 ) => {
-                    if (title.startsWith("exception")) {
-                        throw new Error("Failed");
+                    return new Promise((resolve, reject) => {
+                        if (title.startsWith("exception")) {
+                            return reject("Failed");
+                        }
+                        const mNote = mockNotes.find(
+                            (mNote) =>
+                                mNote._id === noteId && mNote.owner === userId
+                        );
+                        if (mNote) {
+                            mNote.note = note;
+                            mNote.title = title;
+                            return resolve(
+                                mNote as unknown as Document<
+                                    unknown,
+                                    {},
+                                    INote
+                                > &
+                                    INote & { _id: mongoose.Types.ObjectId }
+                            );
+                        }
+                        return resolve(null);
+                    });
+                }
+            );
+
+        sandbox.stub(queries, "FindNoteById").callsFake((noteId: string) => {
+            return new Promise((resolve, reject) => {
+                if (noteId.startsWith("exception")) {
+                    return reject("Fails");
+                }
+                const note = mockNotes.find((note) => note._id === noteId);
+                if (note) {
+                    if (note.title.startsWith("fail")) {
+                        return resolve(null);
                     }
-                    const mNote = mockNotes.find(
-                        (mNote) =>
-                            mNote._id === noteId && mNote.owner === userId
+                    return resolve(
+                        note as unknown as Document<unknown, {}, INote> &
+                            INote & { _id: mongoose.Types.ObjectId }
                     );
-                    if (mNote) {
-                        mNote.note = note;
-                        mNote.title = title;
-                        return mNote;
-                    }
-                    return null;
                 }
-            ),
-        FindNoteById: jest.fn().mockImplementation((noteId: string) => {
-            if (noteId.startsWith("exception")) {
-                throw new Error("Fails");
-            }
-            const note = mockNotes.find((note) => note._id === noteId);
-            if (note) {
-                if (note.title.startsWith("fail")) {
-                    return null;
-                }
-                return note;
-            }
-            return null;
-        }),
-        FindNoteByIdAndOwnerId: jest
-            .fn()
-            .mockImplementation((noteId: string, userId: string) => {
-                const note = mockNotes.find(
-                    (note) => note._id === noteId && note.owner === userId
+                return resolve(null);
+            });
+        });
+        sandbox
+            .stub(queries, "FindNoteByIdAndOwnerId")
+            .callsFake((noteId: string, userId: string) => {
+                return new Promise((resolve, reject) => {
+                    const note = mockNotes.find(
+                        (note) => note._id === noteId && note.owner === userId
+                    );
+                    return resolve(
+                        note
+                            ? (note as unknown as Document<unknown, {}, INote> &
+                                  INote & { _id: mongoose.Types.ObjectId })
+                            : null
+                    );
+                });
+            });
+
+        sandbox.stub(queries, "FindNoteByTitle").callsFake((title: string) => {
+            return new Promise((resolve, reject) => {
+                const note = mockNotes.find((note) => note.title === title);
+                return resolve(
+                    note
+                        ? (note as unknown as Document<unknown, {}, INote> &
+                              INote & { _id: mongoose.Types.ObjectId })
+                        : null
                 );
-                return note ? note : null;
-            }),
-        FindNoteByTitle: jest.fn().mockImplementation((title: string) => {
-            const note = mockNotes.find((note) => note.title === title);
-            return note ? note : null;
-        }),
-        FindNoteIdsFromAccessByUserId: jest
-            .fn()
-            .mockImplementation((userId: string) => {
-                return mockAccess.filter((access) => access.user === userId);
-            }),
-        FindNotesByNoteIdIn: jest
-            .fn()
-            .mockImplementation((notedIds: string[]) => {
-                return mockNotes.filter((note) => notedIds.includes(note._id));
-            }),
-        FindNotesByOwnerId: jest.fn().mockImplementation((ownerId: string) => {
-            if (ownerId.startsWith("exception")) {
-                throw new Error("Failed");
-            }
-            return mockNotes.filter((note) => note.owner === ownerId);
-        }),
-        FindOneUserByUsernameOrEmail: jest
-            .fn()
-            .mockImplementation((username: string, email: string) => {
+            });
+        });
+        sandbox
+            .stub(queries, "FindNoteIdsFromAccessByUserId")
+            .callsFake((userId: string) => {
+                return new Promise((resolve, reject) => {
+                    const ids = mockAccess.filter(
+                        (access) => access.user === userId
+                    ) as unknown[] as (Document<unknown, {}, IAccess> &
+                        IAccess & { _id: mongoose.Types.ObjectId })[];
+                    return resolve(ids);
+                });
+            });
+        sandbox
+            .stub(queries, "FindNotesByNoteIdIn")
+            .callsFake((notedIds: mongoose.Types.ObjectId[]) => {
+                return new Promise((resolve, reject) => {
+                    const notes = mockNotes.filter((note) =>
+                        notedIds.includes(
+                            note._id as unknown as mongoose.Types.ObjectId
+                        )
+                    ) as unknown[] as (Document<unknown, {}, INote> &
+                        INote & { _id: mongoose.Types.ObjectId })[];
+                    return resolve(notes);
+                });
+            });
+
+        sandbox
+            .stub(queries, "FindNotesByOwnerId")
+            .callsFake((ownerId: string) => {
+                return new Promise((resolve, reject) => {
+                    if (ownerId.startsWith("exception")) {
+                        return reject("Failed");
+                    }
+                    const notes = mockNotes.filter(
+                        (note) => note.owner === ownerId
+                    );
+                    return resolve(
+                        notes as unknown[] as (Document<unknown, {}, INote> &
+                            INote & { _id: mongoose.Types.ObjectId })[]
+                    );
+                });
+            });
+        sandbox
+            .stub(queries, "FindOneUserByUsernameOrEmail")
+            .callsFake((username: string, email: string) => {
                 const user = {
                     _id: "owner-3",
                     username: "existingUser",
@@ -151,83 +246,89 @@ jest.mock("../../../../../src/db/queries", () => {
                         username.startsWith("exception") ||
                         email.startsWith("exception")
                     )
-                        throw new Error("Failed");
+                        return reject("Failed");
                     if (
                         email.startsWith("tokenException") ||
                         username.startsWith("tokenException")
                     ) {
-                        return resolve(user);
+                        return resolve(
+                            user as unknown as Document<unknown, {}, IUser> &
+                                IUser & { _id: mongoose.Types.ObjectId }
+                        );
                     }
                     if (user.email === email || user.username === username) {
-                        return resolve(user);
+                        return resolve(
+                            user as unknown as Document<unknown, {}, IUser> &
+                                IUser & { _id: mongoose.Types.ObjectId }
+                        );
                     } else {
                         return resolve(null);
                     }
                 });
-            }),
-    };
-});
-
-describe("NotesService", () => {
+            });
+    });
+    after(() => {
+        sandbox.restore();
+    });
     let notesService: NotesService;
     describe("getAllNotesService", () => {
         it("should-return-all-owned-and-shared-notes", async () => {
             notesService = new NotesService();
             const result = await notesService.getAllNotesService("owner");
-            expect(result.ownedNotes.length).toEqual(2);
-            expect(result.sharedWithMe.length).toEqual(1);
+            expect(result.ownedNotes.length).to.be.equal(2);
+            expect(result.sharedWithMe.length).to.be.equal(1);
         });
         it("should-return-all-owned-notes-and-empty-shared-notes", async () => {
             notesService = new NotesService();
             const result = await notesService.getAllNotesService("owner-2");
-            expect(result.ownedNotes.length).toEqual(2);
-            expect(result.sharedWithMe.length).toEqual(0);
+            expect(result.ownedNotes.length).to.be.equal(2);
+            expect(result.sharedWithMe.length).to.be.equal(0);
         });
         it("should-return-empty-owned-notes-and-all-shared-notes", async () => {
             notesService = new NotesService();
             const result = await notesService.getAllNotesService("owner-3");
-            expect(result.ownedNotes.length).toEqual(0);
-            expect(result.sharedWithMe.length).toEqual(2);
+            expect(result.ownedNotes.length).to.be.equal(0);
+            expect(result.sharedWithMe.length).to.be.equal(2);
         });
         it("should-return-both-owned-notes-and-shared-notes-as-empty", async () => {
             notesService = new NotesService();
             const result = await notesService.getAllNotesService("owner-4");
-            expect(result.ownedNotes.length).toEqual(0);
-            expect(result.sharedWithMe.length).toEqual(0);
+            expect(result.ownedNotes.length).to.be.equal(0);
+            expect(result.sharedWithMe.length).to.be.equal(0);
         });
         it("should-throw-api-error-exception", async () => {
             notesService = new NotesService();
-            await expect(
-                notesService.getAllNotesService("exceptionOwner")
-            ).rejects.toThrow(ApiError);
+            notesService
+                .getAllNotesService("exceptionOwner")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("getNoteService", () => {
         it("should-return-note-successfully", async () => {
             notesService = new NotesService();
             const result = await notesService.getNoteService("owner", "id1");
-            expect(result.note?.owner).toEqual("owner");
+            expect(result.note?.owner).to.be.equal("owner");
         });
         it("should-return-shared-note-successfully", async () => {
             notesService = new NotesService();
             const result = await notesService.getNoteService("owner", "id3");
-            expect(result.note?.owner).toEqual("owner-2");
+            expect(result.note?.owner).to.be.equal("owner-2");
         });
         it("should-return-null-for-not-shared-note", async () => {
             notesService = new NotesService();
             const result = await notesService.getNoteService("owner-2", "id1");
-            expect(result.note).toBeNull();
+            expect(result.note).to.be.null;
         });
         it("should-return-null-if-note-does-not-exist", async () => {
             notesService = new NotesService();
             const result = await notesService.getNoteService("owner", "id10");
-            expect(result.note).toBeNull();
+            expect(result.note).to.be.null;
         });
         it("should-throw-error", async () => {
             notesService = new NotesService();
-            await expect(
-                notesService.getNoteService("exceptionOwner", "id10")
-            ).rejects.toThrow(ApiError);
+            notesService
+                .getNoteService("exceptionOwner", "id10")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("createNoteService", () => {
@@ -238,10 +339,10 @@ describe("NotesService", () => {
                 "newTitle",
                 "newNote"
             );
-            expect(result.exist).toBeFalsy();
-            expect(result.failed).toBeFalsy();
-            expect(result.note).not.toBeNull();
-            expect((result.note as any)._id).toEqual(`newnewTitle`);
+            expect(result.exist).to.be.false;
+            expect(result.failed).to.be.false;
+            expect(result.note).not.to.be.null;
+            expect((result.note as any)._id).to.be.equal(`newnewTitle`);
         });
         it("should-return-note-exist", async () => {
             const result = await notesService.createNoteService(
@@ -249,9 +350,9 @@ describe("NotesService", () => {
                 "title-1",
                 "newNote"
             );
-            expect(result.exist).toBeTruthy();
-            expect(result.failed).toBeFalsy();
-            expect(result.note).toBeNull();
+            expect(result.exist).to.be.true;
+            expect(result.failed).to.be.false;
+            expect(result.note).to.be.null;
         });
         it("should-fail", async () => {
             const result = await notesService.createNoteService(
@@ -259,18 +360,14 @@ describe("NotesService", () => {
                 "failTitle",
                 "newNote"
             );
-            expect(result.exist).toBeFalsy();
-            expect(result.failed).toBeTruthy();
-            expect(result.note).toBeNull();
+            expect(result.exist).to.be.false;
+            expect(result.failed).to.be.true;
+            expect(result.note).to.be.null;
         });
         it("should-throw-error", async () => {
-            await expect(
-                notesService.createNoteService(
-                    "owner-4",
-                    "exceptionTitle",
-                    "newNote"
-                )
-            ).rejects.toThrow(ApiError);
+            notesService
+                .createNoteService("owner-4", "exceptionTitle", "newNote")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("updateNoteService", () => {
@@ -282,11 +379,11 @@ describe("NotesService", () => {
                 "note-1-updated",
                 "owner"
             );
-            expect(result.doesNotExists).toBeFalsy();
-            expect(result.exists).toBeFalsy();
-            expect(result.updatedNote).not.toBeNull();
-            expect(result.updatedNote?.note).toEqual("note-1-updated");
-            expect(result.updatedNote?.title).toEqual("title-1-updated");
+            expect(result.doesNotExists).to.be.false;
+            expect(result.exists).to.be.false;
+            expect(result.updatedNote).not.to.be.null;
+            expect(result.updatedNote?.note).to.be.equal("note-1-updated");
+            expect(result.updatedNote?.title).to.be.equal("title-1-updated");
         });
         it("should-give-does-not-exist", async () => {
             const result = await notesService.updateNoteService(
@@ -295,9 +392,9 @@ describe("NotesService", () => {
                 "notexist",
                 "random"
             );
-            expect(result.doesNotExists).toBeTruthy();
-            expect(result.exists).toBeFalsy();
-            expect(result.updatedNote).toBeNull();
+            expect(result.doesNotExists).to.be.true;
+            expect(result.exists).to.be.false;
+            expect(result.updatedNote).to.be.null;
         });
         it("should-give-another-note-already-exist-with-title", async () => {
             const result = await notesService.updateNoteService(
@@ -306,39 +403,34 @@ describe("NotesService", () => {
                 "note-2",
                 "owner"
             );
-            expect(result.doesNotExists).toBeFalsy();
-            expect(result.exists).toBeTruthy();
-            expect(result.updatedNote).toBeNull();
+            expect(result.doesNotExists).to.be.false;
+            expect(result.exists).to.be.true;
+            expect(result.updatedNote).to.be.null;
         });
         it("should-throw-error", async () => {
-            await expect(
-                notesService.updateNoteService(
-                    "id1",
-                    "exception",
-                    "note-2",
-                    "owner"
-                )
-            ).rejects.toThrow(ApiError);
+            notesService
+                .updateNoteService("id1", "exception", "note-2", "owner")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("deleteNoteService", () => {
         it("should-delete-successfully", async () => {
             const result = await notesService.deleteNoteService("owner", "id1");
-            expect(result.deletedNote).not.toBeNull();
-            expect(result.failed).toBeFalsy();
+            expect(result.deletedNote).not.to.be.null;
+            expect(result.failed).to.be.false;
         });
         it("should-fail-to-delete", async () => {
             const result = await notesService.deleteNoteService(
                 "random",
                 "id43"
             );
-            expect(result.deletedNote).toBeNull();
-            expect(result.failed).toBeTruthy();
+            expect(result.deletedNote).to.be.null;
+            expect(result.failed).to.be.true;
         });
         it("should-throw-exception", async () => {
-            await expect(
-                notesService.deleteNoteService("exception", "id43")
-            ).rejects.toThrow(ApiError);
+            notesService
+                .deleteNoteService("exception", "id43")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
     describe("shareNoteService", () => {
@@ -350,10 +442,10 @@ describe("NotesService", () => {
                 "existing@example.com",
                 null
             );
-            expect(result.failed).toBeFalsy();
-            expect(result.notAuthorized).toBeFalsy();
-            expect(result.noteDoesNotExists).toBeFalsy();
-            expect(result.toBeSharedWithUserNotExists).toBeFalsy();
+            expect(result.failed).to.be.false;
+            expect(result.notAuthorized).to.be.false;
+            expect(result.noteDoesNotExists).to.be.false;
+            expect(result.toBeSharedWithUserNotExists).to.be.false;
         });
         it("should-give-note-does-not-exist", async () => {
             const result = await notesService.shareNoteService(
@@ -362,10 +454,10 @@ describe("NotesService", () => {
                 "existing@example.com",
                 null
             );
-            expect(result.failed).toBeFalsy();
-            expect(result.notAuthorized).toBeFalsy();
-            expect(result.noteDoesNotExists).toBeTruthy();
-            expect(result.toBeSharedWithUserNotExists).toBeFalsy();
+            expect(result.failed).to.be.false;
+            expect(result.notAuthorized).to.be.false;
+            expect(result.noteDoesNotExists).to.be.true;
+            expect(result.toBeSharedWithUserNotExists).to.be.false;
         });
         it("should-give-not-authorized", async () => {
             const result = await notesService.shareNoteService(
@@ -374,10 +466,10 @@ describe("NotesService", () => {
                 null,
                 "existingUser"
             );
-            expect(result.failed).toBeFalsy();
-            expect(result.notAuthorized).toBeTruthy();
-            expect(result.noteDoesNotExists).toBeFalsy();
-            expect(result.toBeSharedWithUserNotExists).toBeFalsy();
+            expect(result.failed).to.be.false;
+            expect(result.notAuthorized).to.be.true;
+            expect(result.noteDoesNotExists).to.be.false;
+            expect(result.toBeSharedWithUserNotExists).to.be.false;
         });
         it("should-give-to-be-shared-with-user-does-not-exist", async () => {
             const result = await notesService.shareNoteService(
@@ -386,10 +478,10 @@ describe("NotesService", () => {
                 "ex@example.com",
                 null
             );
-            expect(result.failed).toBeFalsy();
-            expect(result.notAuthorized).toBeFalsy();
-            expect(result.noteDoesNotExists).toBeFalsy();
-            expect(result.toBeSharedWithUserNotExists).toBeTruthy();
+            expect(result.failed).to.be.false;
+            expect(result.notAuthorized).to.be.false;
+            expect(result.noteDoesNotExists).to.be.false;
+            expect(result.toBeSharedWithUserNotExists).to.be.true;
         });
         it("should-fail", async () => {
             const result = await notesService.shareNoteService(
@@ -398,20 +490,20 @@ describe("NotesService", () => {
                 "existing@example.com",
                 null
             );
-            // expect(result.failed).toBeTruthy();
-            expect(result.notAuthorized).toBeFalsy();
-            expect(result.noteDoesNotExists).toBeFalsy();
-            expect(result.toBeSharedWithUserNotExists).toBeFalsy();
+            // expect(result.failed).to.be.true;
+            expect(result.notAuthorized).to.be.false;
+            expect(result.noteDoesNotExists).to.be.false;
+            expect(result.toBeSharedWithUserNotExists).to.be.false;
         });
         it("should-throw-error", async () => {
-            await expect(
-                notesService.shareNoteService(
+            notesService
+                .shareNoteService(
                     "exception",
                     "exception",
                     "ex@example.com",
                     null
                 )
-            ).rejects.toThrow(ApiError);
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
 });

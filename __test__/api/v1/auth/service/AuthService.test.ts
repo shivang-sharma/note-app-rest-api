@@ -4,15 +4,27 @@ import {
     LoginServiceResult,
 } from "../../../../../src/api/v1/auth/service/AuthService";
 import { ApiError } from "../../../../../src/util/ApiError";
-import { ExpireRefreshTokenById } from "../../../../../src/db";
+import { IUser } from "../../../../../src/db";
+import * as queries from "../../../../../src/db/queries";
+import sinon from "sinon";
+import { expect } from "chai";
+import { ObjectId, Document } from "mongoose";
+import Sinon from "sinon";
 
-jest.mock("../../../../../src/db/queries", () => {
-    const originalModule = jest.requireActual("../../../../../src/db/queries");
-    return {
-        __esModule: true,
-        ...originalModule,
-        FindOneUserByUsernameOrEmail: jest.fn(
-            (username: string, email: string) => {
+describe("AuthService", () => {
+    let authService: AuthService;
+    let sandbox: Sinon.SinonSandbox;
+    let expireRefreshTokenByIdStub: sinon.SinonStub<
+        [id: string],
+        Promise<void>
+    >;
+    before(() => {
+        sandbox = sinon.createSandbox();
+        sandbox.reset();
+        sandbox.restore();
+        sandbox
+            .stub(queries, "FindOneUserByUsernameOrEmail")
+            .callsFake((username, email) => {
                 const user = {
                     _id: "mockUserId",
                     username: "existingUser",
@@ -43,26 +55,31 @@ jest.mock("../../../../../src/db/queries", () => {
                         email.startsWith("tokenException") ||
                         username.startsWith("tokenException")
                     ) {
-                        return resolve(user);
+                        return resolve(
+                            user as unknown as Document<unknown, {}, IUser> &
+                                IUser & { _id: ObjectId }
+                        );
                     }
                     if (user.email === email || user.username === username) {
-                        return resolve(user);
+                        return resolve(
+                            user as unknown as Document<unknown, {}, IUser> &
+                                IUser & { _id: ObjectId }
+                        );
                     } else {
                         return resolve(null);
                     }
                 });
-            }
-        ),
-        CreateNewUser: jest.fn(
-            (
-                fullName: string,
-                username: string,
-                email: string,
-                password: string
-            ) => {
+            });
+
+        sandbox
+            .stub(queries, "CreateNewUser")
+            .callsFake((fullName, username, email, password) => {
                 return new Promise((resolve, reject) => {
                     if (username.startsWith("fail")) {
-                        return resolve({ _id: "notexist" });
+                        return resolve({
+                            _id: "notexist",
+                        } as unknown as Document<unknown, {}, IUser> &
+                            IUser & { _id: ObjectId });
                     } else if (username.startsWith("exception")) {
                         return reject(new Error("Failed"));
                     }
@@ -72,11 +89,14 @@ jest.mock("../../../../../src/db/queries", () => {
                         fullName: email,
                         email: password,
                     };
-                    return resolve(mockUser);
+                    return resolve(
+                        mockUser as unknown as Document<unknown, {}, IUser> &
+                            IUser & { _id: ObjectId }
+                    );
                 });
-            }
-        ),
-        FindOneUserById: jest.fn((id: string) => {
+            });
+
+        sandbox.stub(queries, "FindOneUserById").callsFake((id) => {
             return new Promise((resolve, reject) => {
                 const mockUser = {
                     _id: "createdMockUserId",
@@ -87,22 +107,28 @@ jest.mock("../../../../../src/db/queries", () => {
                 if (id === "notexist") {
                     return resolve(null);
                 }
-                return resolve(mockUser);
+                return resolve(
+                    mockUser as unknown as Document<unknown, {}, IUser> &
+                        IUser & { _id: ObjectId }
+                );
             });
-        }),
-        ExpireRefreshTokenById: jest.fn((id: string) => {
-            if (id === "failureId") throw new Error("Failed");
-        }),
-    };
-});
+        });
 
-describe("AuthService", () => {
-    let authService: AuthService;
-
+        expireRefreshTokenByIdStub = sandbox
+            .stub(queries, "ExpireRefreshTokenById")
+            .callsFake((id) => {
+                return new Promise((resolve, reject) => {
+                    if (id === "failureId") return reject(Error("Failed"));
+                    resolve();
+                });
+            });
+    });
+    after(() => {
+        sandbox.restore();
+    });
     beforeEach(() => {
         authService = new AuthService();
     });
-
     describe("signUpService", () => {
         it("should sign up a new user successfully", async () => {
             const result: SignUpServiceResult = await authService.signUpService(
@@ -112,9 +138,9 @@ describe("AuthService", () => {
                 "password"
             );
 
-            expect(result.exist).toBeFalsy();
-            expect(result.failed).toBeFalsy();
-            expect(result.user).toEqual({
+            expect(result.exist).to.be.false;
+            expect(result.failed).to.be.false;
+            expect(result.user).to.be.deep.equal({
                 _id: "createdMockUserId",
                 username: "testUser",
                 fullName: "Test User",
@@ -129,9 +155,9 @@ describe("AuthService", () => {
                 "existing@example.com",
                 "password"
             );
-            expect(result.exist).toBeTruthy();
-            expect(result.failed).toBeFalsy();
-            expect(result.user).toBeNull();
+            expect(result.exist).to.be.true;
+            expect(result.failed).to.be.false;
+            expect(result.user).to.be.null;
         });
 
         it("should handle user creation failure", async () => {
@@ -141,20 +167,22 @@ describe("AuthService", () => {
                 "failTest@example.com",
                 "password"
             );
-            expect(result.exist).toBeFalsy();
-            expect(result.failed).toBeTruthy();
-            expect(result.user).toBeNull();
+            expect(result.exist).to.be.false;
+            expect(result.failed).to.be.true;
+            expect(result.user).to.be.null;
         });
 
         it("should handle unexpected errors", async () => {
-            await expect(
-                authService.signUpService(
+            authService
+                .signUpService(
                     "exceptionTestUser",
                     "Test User",
                     "test@example.com",
                     "password"
                 )
-            ).rejects.toThrow(ApiError);
+                .catch((error) => {
+                    expect(error).to.be.instanceOf(ApiError);
+                });
         });
     });
 
@@ -164,13 +192,13 @@ describe("AuthService", () => {
                 "existing@example.com",
                 "password"
             );
-            expect(result.doesNotExist).toBeFalsy();
-            expect(result.failed).toBeFalsy();
-            expect(result.invalidCredentials).toBeFalsy();
-            expect(result.accessToken).toEqual("accessToken");
-            expect(result.refreshToken).toEqual("refreshToken");
-            expect(result.message).toBeNull();
-            expect(result.user).toEqual({
+            expect(result.doesNotExist).to.be.false;
+            expect(result.failed).to.be.false;
+            expect(result.invalidCredentials).to.be.false;
+            expect(result.accessToken).to.be.equal("accessToken");
+            expect(result.refreshToken).to.be.equal("refreshToken");
+            expect(result.message).to.be.null;
+            expect(result.user).to.be.deep.equal({
                 _id: "createdMockUserId",
                 username: "testUser",
                 fullName: "Test User",
@@ -182,61 +210,66 @@ describe("AuthService", () => {
                 "existing@example.com",
                 "wrongPassword"
             );
-            expect(result.doesNotExist).toBeFalsy();
-            expect(result.failed).toBeFalsy();
-            expect(result.invalidCredentials).toBeTruthy();
-            expect(result.accessToken).toBeNull();
-            expect(result.refreshToken).toBeNull();
-            expect(result.message).toBeNull();
-            expect(result.user).toBeNull();
+            expect(result.doesNotExist).to.be.false;
+            expect(result.failed).to.be.false;
+            expect(result.invalidCredentials).to.be.true;
+            expect(result.accessToken).to.be.null;
+            expect(result.refreshToken).to.be.null;
+            expect(result.message).to.be.null;
+            expect(result.user).to.be.null;
         });
         it("should-give-does-not-exist", async () => {
             const result: LoginServiceResult = await authService.loginService(
                 "random@example.com",
                 "wrongPassword"
             );
-            expect(result.doesNotExist).toBeTruthy();
-            expect(result.failed).toBeFalsy();
-            expect(result.invalidCredentials).toBeFalsy();
-            expect(result.accessToken).toBeNull();
-            expect(result.refreshToken).toBeNull();
-            expect(result.message).toBeNull();
-            expect(result.user).toBeNull();
+            expect(result.doesNotExist).to.be.true;
+            expect(result.failed).to.be.false;
+            expect(result.invalidCredentials).to.be.false;
+            expect(result.accessToken).to.be.null;
+            expect(result.refreshToken).to.be.null;
+            expect(result.message).to.be.null;
+            expect(result.user).to.be.null;
         });
         it("should-fail", async () => {
             const result: LoginServiceResult = await authService.loginService(
                 "tokenException@example.com",
                 "password"
             );
-            expect(result.doesNotExist).toBeFalsy();
-            expect(result.failed).toBeTruthy();
-            expect(result.invalidCredentials).toBeFalsy();
-            expect(result.accessToken).toBeNull();
-            expect(result.refreshToken).toBeNull();
-            expect(result.message).toEqual(
+            expect(result.doesNotExist).to.be.false;
+            expect(result.failed).to.be.true;
+            expect(result.invalidCredentials).to.be.false;
+            expect(result.accessToken).to.be.null;
+            expect(result.refreshToken).to.be.null;
+            expect(result.message).to.be.equal(
                 "Something went wrong while generating referesh and access token"
             );
-            expect(result.user).toBeNull();
+            expect(result.user).to.be.null;
         });
         it("should-throw-exception", async () => {
-            await expect(
-                authService.loginService("exception@example.com", "password")
-            ).rejects.toThrow(ApiError);
+            authService
+                .loginService("exception@example.com", "password")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
         });
     });
 
     describe("logoutService", () => {
         it("should expire refresh token successfully", async () => {
             await authService.logoutService("userId");
-            expect(ExpireRefreshTokenById).toHaveBeenCalledWith("userId");
+            expect(expireRefreshTokenByIdStub.called).to.be.true;
+            expect(expireRefreshTokenByIdStub.firstCall.args[0]).to.be.equal(
+                "userId"
+            );
         });
 
         it("should handle logout failure", async () => {
-            await expect(
-                authService.logoutService("failureId")
-            ).rejects.toThrow(ApiError);
-
-            expect(ExpireRefreshTokenById).toHaveBeenCalledWith("failureId");
+            authService
+                .logoutService("failureId")
+                .catch((error) => expect(error).to.be.instanceOf(ApiError));
+            expect(expireRefreshTokenByIdStub.called).to.be.true;
+            expect(expireRefreshTokenByIdStub.lastCall.args[0]).to.be.equal(
+                "failureId"
+            );
         });
     });
 });
